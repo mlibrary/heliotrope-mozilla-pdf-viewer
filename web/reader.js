@@ -155,11 +155,6 @@ cozy.control.widget.button({
 
 
 // Table of contents widget
-// cozy.control.widget.button({
-//   region: 'top.toolbar.left',
-//   template: '<button class="button--sm" data-toggle="open" aria-label="Table of Contents" id="sidebarToggle"><i class="icon-menu oi" data-glyph="menu" title="Table of Contents" aria-hidden="true"></i></button>'
-// }).addTo(reader);
-// cozy.control.contents({ region: 'top.toolbar.left', skipLink: '.skip' }).addTo(reader);
 var contents = new PDFContents({ region: 'top.toolbar.left', skipLink: '.skip' });
 contents.addTo(reader);
 
@@ -219,14 +214,7 @@ action._control.setAttribute('id', 'next');
 cozy.control.navigator({ region: 'bottom.navigator' }).addTo(reader);
 
 // start reader
-
-var load_viewer_script = function() {
-  // $.getScript("viewer.js");
-
-}
-
-reader.start(); // load_viewer_script);
-
+reader.start();
 
 
 console.log("YO HEY DER");
