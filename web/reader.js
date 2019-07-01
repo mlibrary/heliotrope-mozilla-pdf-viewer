@@ -93,13 +93,16 @@ var PDFReader = cozy.Reader.extend({
       self.PDFViewerApplication = window.PDFViewerApplication;
 
       self.PDFViewerApplication.open(self.options.href).then(function() {
+
+        // reset the zoom to "auto"
+        self.PDFViewerApplication.zoomReset();
+
         self.pdfViewer = this.PDFViewerApplication.pdfViewer;
         var setupInterval = setInterval(function() {
           if ( self.PDFViewerApplication.pdfDocument != null ) {
             clearInterval(setupInterval);
 
             // add events to viewer
-            // evt.pageNumber
             self.PDFViewerApplication.eventBus.on('pagechanging', function(evt) {
               var pageNumber = evt.pageNumber;
               self.fire('relocated', { start: pageNumber });
@@ -136,6 +139,7 @@ var PDFReader = cozy.Reader.extend({
 
               self.fire('updateLocations',  self.locations);
               self.fire('relocated', self.currentLocation());
+              self._disableBookLoader();
               cb();
             });
           } else {
