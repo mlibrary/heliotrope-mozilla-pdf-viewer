@@ -445,7 +445,8 @@ a:focus > .thumbnail > .thumbnailSelectionRing,
   direction: ltr;
   width: 816px;
   height: 1056px;
-  margin: 1px auto -8px auto;
+  /* margin: 1px auto -8px auto; */
+  margin: 1rem auto 1rem auto;
   position: relative;
   overflow: visible;
   border: 9px solid transparent;
@@ -453,6 +454,7 @@ a:focus > .thumbnail > .thumbnailSelectionRing,
   -o-border-image: url(images/shadow.png) 9 9 repeat;
      border-image: url(images/shadow.png) 9 9 repeat;
   background-color: white;
+  box-sizing: content-box;
 }
 
 .pdfViewer.removePageBorders .page {

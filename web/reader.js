@@ -1,4 +1,21 @@
 
+// -- if we needed to extend the Navigator, we'd start here.
+var PDFNavigator = cozy.Control.Navigator.extend({
+
+  // _initializeNavigator: function(locations) {
+  //   this._initiated = true;
+  //   this._total = locations.total;
+  //   this._last_value = this._control.value;
+  //   this._spanTotalLocations.innerHTML = this._total;
+  //   this._update();
+  //   setTimeout(function() {
+  //     this._container.classList.add('initialized');
+  //   }.bind(this), 0);
+  // },
+
+  EOT: true
+});
+
 var PDFContents = cozy.Control.Contents.extend({
   _bindEvents() {
     var self = this;
@@ -76,10 +93,21 @@ var PDFReader = cozy.Reader.extend({
       self.PDFViewerApplication = window.PDFViewerApplication;
 
       self.PDFViewerApplication.open(self.options.href).then(function() {
+
+        // reset the zoom to "auto"
+        self.PDFViewerApplication.zoomReset();
+
         self.pdfViewer = this.PDFViewerApplication.pdfViewer;
         var setupInterval = setInterval(function() {
           if ( self.PDFViewerApplication.pdfDocument != null ) {
             clearInterval(setupInterval);
+
+            // add events to viewer
+            self.PDFViewerApplication.eventBus.on('pagechanging', function(evt) {
+              var pageNumber = evt.pageNumber;
+              self.fire('relocated', { start: pageNumber });
+            });
+
             self.PDFViewerApplication.pdfDocument.getMetadata().then(function(data) {
               console.log("AHOY getMetadata", data);
               var metadata = {};
@@ -95,6 +123,23 @@ var PDFReader = cozy.Reader.extend({
 
               self.fire("updateTitle", self.metadata);
               self.fire('updateContents', {});
+              self.locations = { total: self.PDFViewerApplication.pagesCount };
+              self.locations.locationFromCfi = function(pageNum) {
+                return pageNum;
+              }
+              self.locations.percentageFromCfi = function(pageNum) {
+                return ( pageNum / self.locations.total );
+              }
+              self.locations.cfiFromPercentage = function(percent) {
+                var pageNum = Math.round(self.locations.total * percent);
+                if ( pageNum < 1 ) { pageNum = 1; }
+                if ( pageNum > this._total ) { pageNum = this._total; }
+                return { start: pageNum };
+              }
+
+              self.fire('updateLocations',  self.locations);
+              self.fire('relocated', self.currentLocation());
+              self._disableBookLoader();
               cb();
             });
           } else {
@@ -105,7 +150,14 @@ var PDFReader = cozy.Reader.extend({
     });
   },
 
+  currentLocation: function() {
+    return { start: { cfi: this.PDFViewerApplication.page } };
+  },
 
+  gotoPage: function(cfi) {
+    var pageNum = cfi.start;
+    this.pdfViewer.currentPageLabel = pageNum;
+  },
 
   EOT: true
 
