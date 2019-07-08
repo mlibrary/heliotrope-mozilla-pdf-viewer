@@ -1,4 +1,30 @@
 
+cozy.Control.Preferences.prototype._createPanel = function() {
+  var self = this;
+  if ( this._modal._container.querySelector('form') ) { return; }
+
+  var template = '';
+  var possible_fieldsets = [];
+  possible_fieldsets.push('TextSize');
+  this._fieldsets = [];
+  possible_fieldsets.forEach(function(cls) {
+    var fieldset = new cozy.Control.Preferences.fieldset[cls](this);
+    template += fieldset.template();
+    this._fieldsets.push(fieldset);
+  }.bind(this))
+
+  template = '<form>' + template + '</form>';
+
+  this._modal._container.querySelector('main').innerHTML = template;
+  this._form = this._modal._container.querySelector('form');  
+}
+
+var PDFPreferences = cozy.Control.Preferences.extend({
+
+  EOT: true
+
+});
+
 // -- if we needed to extend the Navigator, we'd start here.
 var PDFNavigator = cozy.Control.Navigator.extend({
 
@@ -17,7 +43,7 @@ var PDFNavigator = cozy.Control.Navigator.extend({
 });
 
 var PDFContents = cozy.Control.Contents.extend({
-  _bindEvents() {
+  _bindEvents: function() {
     var self = this;
 
     this._control.setAttribute('id', 'sidebarToggle');
@@ -93,11 +119,15 @@ var PDFReader = cozy.Reader.extend({
       self.PDFViewerApplication = window.PDFViewerApplication;
 
       self.PDFViewerApplication.open(self.options.href).then(function() {
+        self.pdfViewer = this.PDFViewerApplication.pdfViewer;
 
         // reset the zoom to "auto"
-        self.PDFViewerApplication.zoomReset();
+        // self.PDFViewerApplication.zoomReset();
 
-        self.pdfViewer = this.PDFViewerApplication.pdfViewer;
+        self.pdfViewer.currentScaleValue = 1.2;
+        self.options.text_size = "120";
+
+
         var setupInterval = setInterval(function() {
           if ( self.PDFViewerApplication.pdfDocument != null ) {
             clearInterval(setupInterval);
@@ -111,6 +141,7 @@ var PDFReader = cozy.Reader.extend({
             self.PDFViewerApplication.pdfDocument.getMetadata().then(function(data) {
               console.log("AHOY getMetadata", data);
               var metadata = {};
+              metadata.layout = 'pdf';
               if ( data.metadata ) {
                 if ( data.metadata.has("dc:title") ) {
                   metadata.title = data.metadata.get("dc:title");
@@ -159,6 +190,13 @@ var PDFReader = cozy.Reader.extend({
     this.pdfViewer.currentPageLabel = pageNum;
   },
 
+  reopen: function(options) {
+    this.options.text_size = options.text_size;
+    var currentScale = this.pdfViewer.currentScale;
+    var newScale = parseInt(options.text_size) / 100.0;
+    this.pdfViewer.currentScale = newScale;
+  },
+
   EOT: true
 
 });
@@ -187,7 +225,8 @@ cozy.control.widget.panel({
 
 
 // Book/chapter title widget
-cozy.control.title({ region: 'top.header.left' }).addTo(reader);
+var preferences = new PDFPreferences({ region: 'top.header.left' });
+preferences.addTo(reader);
 
 // Altmetric and Dimensions widgets
 cozy.control.widget.panel({
@@ -254,7 +293,8 @@ cozy.control.widget.button({
   }
 }).addTo(reader);
 
-cozy.control.widget.button({ region: 'top.toolbar.right', template: '<button class="cozy-control cozy-control-preferences" title="Preferences" role="button" aria-label="Preferences"><i class="icon-cog oi" data-glyph="cog" title="Preferences and Settings" aria-hidden="true"></i></button>' }).addTo(reader);
+// cozy.control.widget.button({ region: 'top.toolbar.right', template: '<button class="cozy-control cozy-control-preferences" title="Preferences" role="button" aria-label="Preferences"><i class="icon-cog oi" data-glyph="cog" title="Preferences and Settings" aria-hidden="true"></i></button>' }).addTo(reader);
+cozy.control.preferences({ region: 'top.toolbar.right' }).addTo(reader);
 
 // Paging widgets
 var action = cozy.control.pagePrevious({ region: 'left.sidebar' }).addTo(reader);
