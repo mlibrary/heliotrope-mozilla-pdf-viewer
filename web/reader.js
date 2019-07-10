@@ -381,42 +381,4 @@ cozy.control.navigator({ region: 'bottom.navigator' }).addTo(reader);
 // start reader
 reader.start();
 
-var loadText = function(pageNum) {
-  reader.pdfViewer.pdfDocument.getPage(pageNum).then((pdfPage) => {
-    return pdfPage.getTextContent({
-      normalizeWhitespace: true,
-    });
-  }).then((textContent) => {
-    console.log("AHOY TEXT CONTENT", textContent);
-    const textItems = textContent.items;
-    const strBuf = [];
-
-    for (let j = 0, jj = textItems.length; j < jj; j++) {
-      strBuf.push(textItems[j].str);
-    }
-
-    // Store the normalized page content (text items) as one string.
-    console.log("AHOY NORMALIZED", strBuf);
-  }, (reason) => {
-    console.error(`Unable to get text content for page ${i + 1}`, reason);
-    // Page error -- assuming no text content.
-  });
-}
-
-var loadTextDiv = function(div) {
-  var pageNum = div.dataset.pageNumber;
-  var textLayerDiv = document.createElement('div');
-  textLayerDiv.className = 'textLayer';
-  textLayerDiv.style.width = div.style.width;
-  textLayerDiv.style.height = div.style.height;
-  div.appendChild(textLayerDiv);
-
-  var page = reader.pdfViewer._pages[reader.pdfViewer.currentPageNumber - 1];
-  var textLayer = reader.pdfViewer.
-    createTextLayerBuilder(textLayerDiv, pageNum - 1, page.viewport,
-        false);
-  textLayer.render();
-}
-
-
 console.log("YO HEY DER");
