@@ -67,7 +67,6 @@ var PDFSearch = cozy.Control.Search.extend({
       var text = findController._pageContents[i];
       matches.forEach(function(match, index) {
         var snippet = self._getMatch(text, self.searchString, match);
-        // self._data.search_results.push({ page: i, matchIdx: match, snippet: snippet });
         self._data.search_results.push({ cfi: i + 1, matchIdx: match, snippet: snippet });
       })
     }
@@ -100,7 +99,16 @@ var PDFSearch = cozy.Control.Search.extend({
               if(leftLimit < 0){break}
               if(_ws.indexOf(string.charAt(leftLimit)) >= 0){whitespace += 1}
           }
-          return string.substr(leftLimit + 1, rightLimit - leftLimit - 1).replace(/([\.\;\,])(\w)/g, '$1 $2') // return match
+
+          var snippet = string.substr(leftLimit + 1, rightLimit - leftLimit - 1).replace(/([\.\;\,])(\w)/g, '$1 $2');
+
+          snippet = snippet.replace(/([a-z])([A-Z])/g, '$1 $2');
+          snippet = snippet.replace(/([a-z])(\d+)([a-z])/gi, '$1 $2 $3');
+          snippet = snippet.replace(/[^ -~]+/g, "");
+          // // --- cozy-sun-bear doesn't highlight terms in search results
+          // var termRe = new RegExp('(' + term + ')', 'gi');
+          // snippet = snippet.replace(termRe, '<strong>$1</strong>');
+          return snippet;
       }
       return // return nothing
   },
@@ -372,6 +380,43 @@ cozy.control.navigator({ region: 'bottom.navigator' }).addTo(reader);
 
 // start reader
 reader.start();
+
+var loadText = function(pageNum) {
+  reader.pdfViewer.pdfDocument.getPage(pageNum).then((pdfPage) => {
+    return pdfPage.getTextContent({
+      normalizeWhitespace: true,
+    });
+  }).then((textContent) => {
+    console.log("AHOY TEXT CONTENT", textContent);
+    const textItems = textContent.items;
+    const strBuf = [];
+
+    for (let j = 0, jj = textItems.length; j < jj; j++) {
+      strBuf.push(textItems[j].str);
+    }
+
+    // Store the normalized page content (text items) as one string.
+    console.log("AHOY NORMALIZED", strBuf);
+  }, (reason) => {
+    console.error(`Unable to get text content for page ${i + 1}`, reason);
+    // Page error -- assuming no text content.
+  });
+}
+
+var loadTextDiv = function(div) {
+  var pageNum = div.dataset.pageNumber;
+  var textLayerDiv = document.createElement('div');
+  textLayerDiv.className = 'textLayer';
+  textLayerDiv.style.width = div.style.width;
+  textLayerDiv.style.height = div.style.height;
+  div.appendChild(textLayerDiv);
+
+  var page = reader.pdfViewer._pages[reader.pdfViewer.currentPageNumber - 1];
+  var textLayer = reader.pdfViewer.
+    createTextLayerBuilder(textLayerDiv, pageNum - 1, page.viewport,
+        false);
+  textLayer.render();
+}
 
 
 console.log("YO HEY DER");
