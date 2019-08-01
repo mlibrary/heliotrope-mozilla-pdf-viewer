@@ -16,8 +16,109 @@ var PDFNavigator = cozy.Control.Navigator.extend({
   EOT: true
 });
 
+var PDFSearch = cozy.Control.Search.extend({
+
+  onAdd: function(reader) {
+    var self = this;
+    console.log("AHOY AHOY", this);
+    this._reader.on('ready', function() {
+      // updatefindcontrolstate -- emites state=FOUND before all the results are found
+      this._reader.PDFViewerApplication.eventBus.on('updatefindmatchescount', this._waitForResults.bind(this));
+      this._reader.PDFViewerApplication.eventBus.on('updatefindcontrolstate', this._waitForQuery.bind(this));
+    }.bind(this));
+
+    return cozy.Control.Search.prototype.onAdd.apply(this, arguments);
+  },
+
+  submitQuery: function() {
+    this._doWaitForResults = false;
+    this._reader.PDFViewerApplication.findController.executeCommand('find', { source: this._reader, type: 'find', query: this.searchString, phraseSearch: true, caseSensitive: false, entireWord: false, highlightAll: true, findPrevious: null })
+  },
+
+  _waitForQuery: function(argv) {
+    // if ( this.queryTimer ) { clearTimeout(this.queryTimer); }
+    if ( argv.state == 0 || argv.state == 2 ) {
+      // the query is done, so we can start computing the results
+      this._doWaitForResults = true;
+    } else if ( argv.state == 1 ) {
+      this._data = { highlight_off: "yes", search_results: [] };
+      this._buildResults();
+    }
+    console.log("AHOY updatefindcontrolstate", argv);
+  },
+
+  _waitForResults: function(argv) {
+    if ( ! this._doWaitForResults ) { return; }
+    if ( this.searchTimer ) { clearTimeout(this.searchTimer); }
+    this.searchTimer = setTimeout(this._gatherResults.bind(this), 500);
+    console.log("AHOY updatefindmatchescount", argv.matchesCount.total);
+  },
+
+  _gatherResults: function() {
+    var self = this;
+
+    this._data = { search_results: [], highlight_off: 'yes' };
+    var pdfViewer = this._reader.pdfViewer;
+    var findController = this._reader.PDFViewerApplication.findController;
+
+    for(var i = 0; i < pdfViewer.pagesCount; i++) {
+      var matches = findController._pageMatches[i];
+      if ( ! matches ) { continue ; }
+      var text = findController._pageContents[i];
+      matches.forEach(function(match, index) {
+        var snippet = self._getMatch(text, self.searchString, match);
+        self._data.search_results.push({ cfi: i + 1, matchIdx: match, snippet: snippet });
+      })
+    }
+
+    this._buildResults();
+  },
+
+  _getMatch: function(string, term, index) {
+      if(index >= 0)
+      {
+          var _ws = [" ","\t"]
+
+          var whitespace = 0
+          var rightLimit = 0
+          var leftLimit = 0
+
+          var whitespaceLimit = 8; // 4
+
+          // right trim index
+          for(rightLimit = index + term.length; whitespace < whitespaceLimit; rightLimit++)
+          {
+              if(rightLimit >= string.length){break}
+              if(_ws.indexOf(string.charAt(rightLimit)) >= 0){whitespace += 1}
+          }
+
+          whitespace = 0
+          // left trim index
+          for(leftLimit = index; whitespace < whitespaceLimit; leftLimit--)
+          {
+              if(leftLimit < 0){break}
+              if(_ws.indexOf(string.charAt(leftLimit)) >= 0){whitespace += 1}
+          }
+
+          var snippet = string.substr(leftLimit + 1, rightLimit - leftLimit - 1).replace(/([\.\;\,])(\w)/g, '$1 $2');
+
+          snippet = snippet.replace(/([a-z])([A-Z])/g, '$1 $2');
+          snippet = snippet.replace(/([a-z])(\d+)([a-z])/gi, '$1 $2 $3');
+          snippet = snippet.replace(/[^ -~]+/g, "");
+          // // --- cozy-sun-bear doesn't highlight terms in search results
+          // var termRe = new RegExp('(' + term + ')', 'gi');
+          // snippet = snippet.replace(termRe, '<strong>$1</strong>');
+          return snippet;
+      }
+      return // return nothing
+  },
+
+  EOT: true
+
+})
+
 var PDFContents = cozy.Control.Contents.extend({
-  _bindEvents() {
+  _bindEvents: function() {
     var self = this;
 
     this._control.setAttribute('id', 'sidebarToggle');
@@ -89,6 +190,10 @@ var PDFReader = cozy.Reader.extend({
     this._panes['epub'].setAttribute('id', 'viewerContainer');
     $(this._panes['epub']).append('<div id="viewer" class="pdfViewer"></div>');
 
+    this.annotations = {
+      reset: function() { /* NOP */ }
+    }
+
     $.getScript("viewer.js", function() {
       self.PDFViewerApplication = window.PDFViewerApplication;
 
@@ -142,6 +247,8 @@ var PDFReader = cozy.Reader.extend({
               self._disableBookLoader();
               cb();
             });
+
+            self.fire("ready");
           } else {
             console.log("AHOY WAITING");
           }
@@ -155,6 +262,9 @@ var PDFReader = cozy.Reader.extend({
   },
 
   gotoPage: function(cfi) {
+    if ( typeof(cfi) == "string" ) {
+      cfi = { start: cfi.replace('epubcfi(', '').replace(')','') };
+    }
     var pageNum = cfi.start;
     this.pdfViewer.currentPageLabel = pageNum;
   },
@@ -229,10 +339,13 @@ var my_citations = [
 ]
 cozy.control.citation({ region: 'top.toolbar.left', citations: my_citations }).addTo(reader);
 
-cozy.control.widget.panel({
-  region: 'top.toolbar.left',
-  template: '<form class="search"><label class="u-screenreader" for="cozy-search-string">Search in this text</label><input id="cozy-search-string" name="search" type="text" placeholder="Search in this text..."><button class="button--sm" data-toggle="open" aria-label="Search"><i class="icon-magnifying-glass oi" data-glyph="magnifying-glass" title="Search" aria-hidden="true"></i></button></form>'
-}).addTo(reader);
+// cozy.control.widget.panel({
+//   region: 'top.toolbar.left',
+//   template: '<form class="search"><label class="u-screenreader" for="cozy-search-string">Search in this text</label><input id="cozy-search-string" name="search" type="text" placeholder="Search in this text..."><button class="button--sm" data-toggle="open" aria-label="Search"><i class="icon-magnifying-glass oi" data-glyph="magnifying-glass" title="Search" aria-hidden="true"></i></button></form>'
+// }).addTo(reader);
+var search = new PDFSearch({ region: 'top.toolbar.left' });
+search.addTo(reader);
+// cozy.control.search().addTo(reader);
 
 cozy.control.download({
     region: 'top.toolbar.left',
@@ -267,6 +380,5 @@ cozy.control.navigator({ region: 'bottom.navigator' }).addTo(reader);
 
 // start reader
 reader.start();
-
 
 console.log("YO HEY DER");
